@@ -26,26 +26,22 @@ function getGoalScore(stage) {
     return 30 + (stage - 1) * 20;
 }
 
-// 아이템
+// 오브젝트 데이터
 const items = [];
+const powerItems = [];
+const obstacles = [];
 const itemColors = ['#fff700', '#00ff00', '#00ffff', '#ff00ff', '#ff0000'];
-let powerItems = [];
 
-// 레벨
 let speedLevel = 0;
 let sizeLevel = 0;
 
-// 장애물
-const obstacles = []; // 👈 장애물 배열
-
-// 버튼 위치 정의
 const BUTTONS = {
     start: { x: 0, y: 0, w: 180, h: 40 },
-    reset: { x: 0, y: 0, w: 120, h: 30 },
-    pause: { x: width - 100, y: 20, w: 80, h: 30 } // (표시만, 기능 없음)
+    reset: { x: 0, y: 0, w: 120, h: 30 }
 };
 
-// ✅ 기본 공, 속도/크기 레벨 반영해 초기화
+// -------------------- 초기화 및 생성 함수 --------------------
+
 function resetGame() {
     const baseSpeed = 3;
     const baseRadius = 20;
@@ -73,10 +69,9 @@ function resetGame() {
     clearInterval(itemInterval);
     clearInterval(powerInterval);
 
-    spawnObstacles(); // ✅ 장애물도 같이 생성
+    spawnObstacles();
 }
 
-// ✅ 아이템 생성 (1~5점짜리 10개)
 function spawnItems() {
     for (let i = 0; i < 10; i++) {
         const value = Math.ceil(Math.random() * 5);
@@ -87,7 +82,6 @@ function spawnItems() {
     }
 }
 
-// ✅ 파워 아이템 생성 (speedUp, bigBall, bomb 중 하나)
 function spawnPowerItem() {
     const types = ['speedUp', 'bigBall', 'bomb'];
     const type = types[Math.floor(Math.random() * types.length)];
@@ -100,7 +94,6 @@ function spawnPowerItem() {
     });
 }
 
-// ✅ 장애물 생성 (스테이지 - 1 개)
 function spawnObstacles() {
     obstacles.length = 0;
     const count = Math.max(0, stage - 1);
@@ -114,7 +107,22 @@ function spawnObstacles() {
     }
 }
 
-// ✅ 파워아이템 효과 적용
+// -------------------- 충돌 / 효과 --------------------
+
+function isColliding(a, b) {
+    const dx = a.x - b.x;
+    const dy = a.y - b.y;
+    return Math.sqrt(dx * dx + dy * dy) < a.radius + b.radius;
+}
+
+function isCollidingWithObstacle(ball, obs) {
+    const closestX = Math.max(obs.x, Math.min(ball.x, obs.x + obs.width));
+    const closestY = Math.max(obs.y, Math.min(ball.y, obs.y + obs.height));
+    const dx = ball.x - closestX;
+    const dy = ball.y - closestY;
+    return Math.sqrt(dx * dx + dy * dy) < ball.radius;
+}
+
 function updatePowerEffects() {
     for (let i = powerItems.length - 1; i >= 0; i--) {
         if (isColliding(ball, powerItems[i])) {
@@ -138,36 +146,40 @@ function updatePowerEffects() {
     }
 }
 
-
-function moveTo(x, y) {
-    const angle = Math.atan2(y - ball.y, x - ball.x);
-    const speed = Math.sqrt(ball.dx ** 2 + ball.dy ** 2);
-    ball.dx = Math.cos(angle) * speed;
-    ball.dy = Math.sin(angle) * speed;
-}
-
-function isColliding(a, b) {
-    const dx = a.x - b.x;
-    const dy = a.y - b.y;
-    return Math.sqrt(dx * dx + dy * dy) < a.radius + b.radius;
-}
+// -------------------- 게임 상태 업데이트 --------------------
 
 function update() {
     if (!gameStarted) return;
+
     ball.x += ball.dx;
     ball.y += ball.dy;
+
     if (ball.x + ball.radius > width || ball.x - ball.radius < 0) ball.dx *= -1;
     if (ball.y + ball.radius > height || ball.y - ball.radius < 0) ball.dy *= -1;
+
     for (let i = items.length - 1; i >= 0; i--) {
         if (isColliding(ball, items[i])) {
             score += items[i].value;
             items.splice(i, 1);
         }
     }
+
+    for (let i = obstacles.length - 1; i >= 0; i--) {
+        if (isCollidingWithObstacle(ball, obstacles[i])) {
+            obstacles.splice(i, 1);
+            ball.dx *= 0.95;
+            ball.dy *= 0.95;
+            ball.radius *= 0.95;
+            if (speedLevel > 0) speedLevel--;
+            if (sizeLevel > 0) sizeLevel--;
+        }
+    }
+
     updatePowerEffects();
 }
 
-// 그리기
+// -------------------- 그리기 --------------------
+
 function drawBall() {
     if (!gameStarted) return;
     ctx.beginPath();
@@ -201,6 +213,13 @@ function drawPowerItems() {
     });
 }
 
+function drawObstacles() {
+    ctx.fillStyle = '#888';
+    obstacles.forEach(obs => {
+        ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
+    });
+}
+
 function drawScore() {
     if (!gameStarted) {
         drawUI();
@@ -223,11 +242,9 @@ function drawScore() {
     const boxWidth = 180;
     const boxHeight = lines.length * lineHeight + padding * 2;
 
-    // 💠 배경 박스
     ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
     ctx.fillRect(boxX, boxY, boxWidth, boxHeight);
 
-    // 텍스트
     ctx.font = '18px sans-serif';
     ctx.fillStyle = '#fff';
     ctx.textAlign = 'left';
@@ -238,19 +255,17 @@ function drawScore() {
     });
 }
 
-
 function drawUI() {
     const centerX = width / 2;
     const centerY = height / 2;
 
-    ctx.font = '28px "Pretendard", sans-serif';
+    ctx.font = '28px sans-serif';
     ctx.textAlign = 'center';
     ctx.fillStyle = '#fff';
 
     if (stageCleared) {
         ctx.fillText(`🎉 STAGE ${stage} CLEAR!`, centerX, centerY - 100);
         ctx.fillText(`▶ Click to Start Stage ${stage + 1}`, centerX, centerY - 50);
-
         BUTTONS.start.x = centerX - 90;
         BUTTONS.start.y = centerY - 70;
     } else {
@@ -259,9 +274,8 @@ function drawUI() {
         BUTTONS.start.y = centerY - 50;
     }
 
-    drawScoreHistory(centerX, centerY + 10); // ✅ 위치 넘겨줌
+    drawScoreHistory(centerX, centerY + 10);
 
-    // 버튼
     BUTTONS.reset.x = centerX - 60;
     BUTTONS.reset.y = centerY + 200;
 
@@ -304,6 +318,8 @@ function drawScoreHistory(cx, cy) {
     });
 }
 
+// -------------------- 인터랙션 및 루프 --------------------
+
 function saveScoreToHistory() {
     const history = JSON.parse(localStorage.getItem('scoreHistory') || '[]');
     const entry = { score, date: new Date().toISOString() };
@@ -340,7 +356,6 @@ function startGame() {
     }, 1000);
 }
 
-// 마우스 이벤트
 canvas.addEventListener('mousedown', e => {
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
@@ -378,16 +393,9 @@ canvas.addEventListener('mousedown', e => {
     }
 
     if (gameStarted) {
+        const rect = canvas.getBoundingClientRect();
         moveTo(x, y);
     }
-});
-
-// 기타
-window.addEventListener('resize', () => {
-    width = window.innerWidth;
-    height = window.innerHeight;
-    canvas.width = width;
-    canvas.height = height;
 });
 
 canvas.addEventListener('mousemove', e => {
@@ -409,12 +417,27 @@ canvas.addEventListener('mousemove', e => {
     }
 });
 
+window.addEventListener('resize', () => {
+    width = window.innerWidth;
+    height = window.innerHeight;
+    canvas.width = width;
+    canvas.height = height;
+});
+
+function moveTo(x, y) {
+    const angle = Math.atan2(y - ball.y, x - ball.x);
+    const speed = Math.sqrt(ball.dx ** 2 + ball.dy ** 2);
+    ball.dx = Math.cos(angle) * speed;
+    ball.dy = Math.sin(angle) * speed;
+}
+
 function gameLoop() {
     ctx.clearRect(0, 0, width, height);
     update();
     drawBall();
     drawItems();
     drawPowerItems();
+    drawObstacles();
     drawScore();
     requestAnimationFrame(gameLoop);
 }
