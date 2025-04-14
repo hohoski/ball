@@ -6,6 +6,8 @@ let height = window.innerHeight;
 canvas.width = width;
 canvas.height = height;
 
+let ruleShown = false; // 규칙 안내가 아직 안 보였는지
+
 // 게임 상태
 let ball;
 let score = 0;
@@ -263,6 +265,13 @@ function drawUI() {
     ctx.textAlign = 'center';
     ctx.fillStyle = '#fff';
 
+    if (!ruleShown) {
+        drawRules(centerX, centerY);
+        BUTTONS.start.x = centerX - 80;
+        BUTTONS.start.y = centerY + 180;
+        return;
+    }
+
     if (stageCleared) {
         ctx.fillText(`🎉 STAGE ${stage} CLEAR!`, centerX, centerY - 100);
         ctx.fillText(`▶ Click to Start Stage ${stage + 1}`, centerX, centerY - 50);
@@ -275,27 +284,39 @@ function drawUI() {
     }
 
     drawScoreHistory(centerX, centerY + 10);
-
-    BUTTONS.reset.x = centerX - 60;
-    BUTTONS.reset.y = centerY + 200;
-
-    ctx.fillStyle = hoveredButton === 'reset' ? '#555' : '#111';
-    ctx.fillRect(BUTTONS.reset.x, BUTTONS.reset.y, BUTTONS.reset.w, BUTTONS.reset.h);
-
-    ctx.strokeStyle = '#fff';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(BUTTONS.reset.x, BUTTONS.reset.y, BUTTONS.reset.w, BUTTONS.reset.h);
-
-    ctx.fillStyle = '#fff';
-    ctx.font = '16px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(
-        '기록 초기화',
-        BUTTONS.reset.x + BUTTONS.reset.w / 2,
-        BUTTONS.reset.y + BUTTONS.reset.h / 2
-    );
+    // reset 버튼 그대로
 }
+
+function drawRules(cx, cy) {
+    ctx.font = '24px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('🎮 Game Rules', cx, cy - 140);
+
+    const lines = [
+        '1. 제한 시간 안에 목표 점수를 달성하세요!',
+        '2. 점수 아이템을 먹으면 점수가 올라요 (1~5점)',
+        '3. 파워 아이템:',
+        '- SpeedUp: 속도 증가',
+        '- BigBall: 크기 증가',
+        '- Bomb: 모든 점수 아이템 획득',
+        '4. 장애물에 닿으면 속도/크기 감소, 레벨 하락',
+        '5. 목표 점수 달성 시 다음 스테이지로!'
+    ];
+
+    ctx.font = '16px sans-serif';
+    ctx.textAlign = 'left';
+    lines.forEach((line, i) => {
+        ctx.fillText(line, cx - 150, cy - 100 + i * 22);
+    });
+
+    // 시작 버튼 안내
+    ctx.textAlign = 'center';
+    ctx.font = '20px sans-serif';
+    ctx.fillStyle = '#fff';
+    ctx.fillText('▶ 게임 시작', cx, cy + 200);
+}
+
+
 
 function drawScoreHistory(cx, cy) {
     let history = JSON.parse(localStorage.getItem('scoreHistory') || '[]');
@@ -356,12 +377,24 @@ function startGame() {
     }, 1000);
 }
 
-canvas.addEventListener('mousedown', e => {
+canvas.addEventListener('mousedown', (e) => {
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
 
     if (!gameStarted) {
+        if (!ruleShown) {
+            if (
+                x >= BUTTONS.start.x &&
+                x <= BUTTONS.start.x + BUTTONS.start.w &&
+                y >= BUTTONS.start.y &&
+                y <= BUTTONS.start.y + BUTTONS.start.h
+            ) {
+                ruleShown = true;
+                return;
+            }
+        }
+
         if (
             x >= BUTTONS.reset.x && x <= BUTTONS.reset.x + BUTTONS.reset.w &&
             y >= BUTTONS.reset.y && y <= BUTTONS.reset.y + BUTTONS.reset.h
@@ -392,11 +425,9 @@ canvas.addEventListener('mousedown', e => {
         }
     }
 
-    if (gameStarted) {
-        const rect = canvas.getBoundingClientRect();
-        moveTo(x, y);
-    }
+    if (gameStarted) moveTo(x, y);
 });
+
 
 canvas.addEventListener('mousemove', e => {
     const rect = canvas.getBoundingClientRect();
